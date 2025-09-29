@@ -6,11 +6,40 @@ const CONFIG = {
   // IMPORTANT: Replace this with your Outlook calendar ICS feed URL
   ICS_FEED_URL: 'YOUR_OUTLOOK_ICS_URL_HERE',
   
-  // Name of the Google Calendar to sync events to (must already exist)
+  // Calendar Configuration
+  // Set to null to use your default/primary calendar, or specify a calendar name
+  // Examples: 'Work', 'Personal', null (for default calendar)
   TARGET_CALENDAR_NAME: 'Work',
   
+  // Event Color Configuration
+  // Set to null to keep default calendar color, or use one of these color names:
+  // "PALE_BLUE", "PALE_GREEN", "MAUVE", "PALE_RED", "YELLOW", "ORANGE",
+  // "CYAN", "GRAY", "BLUE", "GREEN", "RED"
+  // Example: "BLUE" or null (default)
+  EVENT_COLOR: null,
+  
   // How many weeks ahead to sync events
-  SYNC_WEEKS_AHEAD: 8
+  SYNC_WEEKS_AHEAD: 8,
+  
+  SYNC_MARKER: '[Synced from Outlook]'
+};
+
+// ============================================================================
+// COLOR MAPPING
+// ============================================================================
+
+const COLOR_MAP = {
+  'PALE_BLUE': CalendarApp.EventColor.PALE_BLUE,
+  'PALE_GREEN': CalendarApp.EventColor.PALE_GREEN,
+  'MAUVE': CalendarApp.EventColor.MAUVE,
+  'PALE_RED': CalendarApp.EventColor.PALE_RED,
+  'YELLOW': CalendarApp.EventColor.YELLOW,
+  'ORANGE': CalendarApp.EventColor.ORANGE,
+  'CYAN': CalendarApp.EventColor.CYAN,
+  'GRAY': CalendarApp.EventColor.GRAY,
+  'BLUE': CalendarApp.EventColor.BLUE,
+  'GREEN': CalendarApp.EventColor.GREEN,
+  'RED': CalendarApp.EventColor.RED
 };
 
 // ============================================================================
@@ -131,143 +160,198 @@ function syncCalendarEvents() {
     const events = parseICS(icsData);
     Logger.log(`Successfully parsed ${events.length} total events from ICS feed`);
     
-    // Get the target calendar by name
-    const calendars = CalendarApp.getCalendarsByName(CONFIG.TARGET_CALENDAR_NAME);
-    if (calendars.length === 0) {
-      throw new Error(`Calendar "${CONFIG.TARGET_CALENDAR_NAME}" not found. Please create it first.`);
+    let calendar;
+    if (CONFIG.TARGET_CALENDAR_NAME === null) {
+      // Use default/primary calendar
+      calendar = CalendarApp.getDefaultCalendar();
+      Logger.log('Using default calendar');
+    } else {
+      // Use named calendar, create if doesn't exist
+      const calendars = CalendarApp.getCalendarsByName(CONFIG.TARGET_CALENDAR_NAME);
+      if (calendars.length === 0) {
+        Logger.log(`Calendar "${CONFIG.TARGET_CALENDAR_NAME}" not found. Creating it...`);
+        calendar = CalendarApp.createCalendar(CONFIG.TARGET_CALENDAR_NAME);
+        Logger.log(`Created calendar "${CONFIG.TARGET_CALENDAR_NAME}"`);
+      } else {
+        calendar = calendars[0];
+      }
     }
-    const calendar = calendars[0];
     
-    // Get existing events to avoid duplicates
     const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
     const futureDate = new Date(now.getTime() + (CONFIG.SYNC_WEEKS_AHEAD * 7 * 24 * 60 * 60 * 1000));
     Logger.log(`Syncing events from ${now.toISOString()} to ${futureDate.toISOString()}`);
     
-    const existingEvents = calendar.getEvents(now, futureDate);
-    Logger.log(`Found ${existingEvents.length} existing events in target calendar`);
+    const existingEvents = calendar.getEvents(oneWeekAgo, futureDate);
+    const syncedEvents = existingEvents.filter(event => {
+      const desc = event.getDescription();
+      return desc && desc.includes(CONFIG.SYNC_MARKER);
+    });
+    Logger.log(`Found ${syncedEvents.length} existing synced events in target calendar`);
     
-    // Create a map of existing events for quick lookup
-    const existingEventMap = {};
-    existingEvents.forEach(event => {
-      const key = `${event.getTitle()}_${event.getStartTime().getTime()}_${event.getEndTime().getTime()}`;
-      existingEventMap[key] = true;
+    const expandedEvents = [];
+    events.forEach(event => {
+      if (event.recurrence && event.rruleString) {
+        // Expand recurring event into individual occurrences
+        const occurrences = expandRecurringEvent(event, now, futureDate);
+        expandedEvents.push(...occurrences);
+        Logger.log(`Expanded recurring event "${event.title}" into ${occurrences.length} occurrences`);
+      } else {
+        // Regular one-time event
+        if (event.endTime >= now && event.startTime <= futureDate) {
+          expandedEvents.push(event);
+        }
+      }
     });
     
-    // Add new events
-    let addedCount = 0;
-    let skippedPast = 0;
-    let skippedDuplicate = 0;
-    let skippedFuture = 0;
-    let skippedOldRecurring = 0;
-    let errorCount = 0;
-    let recurringCount = 0;
+    Logger.log(`Total events after expansion: ${expandedEvents.length}`);
     
-    events.forEach((event, index) => {
-      Logger.log(`\n--- Processing event #${index + 1}: "${event.title}" ---`);
-      Logger.log(`  Start: ${event.startTime ? event.startTime.toISOString() : 'NULL'}`);
-      Logger.log(`  End: ${event.endTime ? event.endTime.toISOString() : 'NULL'}`);
-      Logger.log(`  Has recurrence: ${event.recurrence ? 'YES' : 'NO'}`);
-      if (event.rruleString) {
-        Logger.log(`  RRULE string: ${event.rruleString}`);
-      }
+    const feedEventKeys = new Set(); // Events from the feed
+    const existingEventMap = {}; // Existing events by key
+    
+    syncedEvents.forEach(event => {
+      const desc = event.getDescription();
+      const uidMatch = desc ? desc.match(/UID:([^\n]+)/) : null;
       
-      // Handle recurring events differently - don't skip if they have recurrence
-      if (event.recurrence) {
-        recurringCount++;
-        Logger.log(`  → This is a recurring event`);
-        
-        // Skip recurring events that started more than 6 months ago to avoid very old series
-        const sixMonthsAgo = new Date(now.getTime() - (180 * 24 * 60 * 60 * 1000));
-        if (event.startTime < sixMonthsAgo) {
-          Logger.log(`  → SKIPPED: Recurring event started too long ago (${event.startTime.toISOString()})`);
-          skippedOldRecurring++;
-          return;
-        }
+      let key;
+      if (uidMatch) {
+        // Trim whitespace from UID
+        const uid = uidMatch[1].trim();
+        key = `${uid}_${event.getStartTime().getTime()}`;
       } else {
-        Logger.log(`  → This is a one-time event`);
-        
-        // For non-recurring events, skip if in the past
-        if (event.endTime < now) {
-          Logger.log(`  → SKIPPED: Event ended in the past (${event.endTime.toISOString()})`);
-          skippedPast++;
-          return;
-        }
-        
-        // Skip events too far in the future
-        if (event.startTime > futureDate) {
-          Logger.log(`  → SKIPPED: Event is beyond ${CONFIG.SYNC_WEEKS_AHEAD} weeks (${event.startTime.toISOString()})`);
-          skippedFuture++;
-          return;
-        }
+        // Fallback to title+time key
+        key = generateEventKey(event.getTitle(), event.getStartTime(), event.getEndTime());
       }
       
-      const key = `${event.title}_${event.startTime.getTime()}_${event.endTime.getTime()}`;
+      if (existingEventMap[key]) {
+        Logger.log(`WARNING: Found duplicate existing event with key ${key}: "${event.getTitle()}" at ${event.getStartTime().toISOString()}`);
+        // Keep track of duplicate for potential cleanup
+        if (!existingEventMap[key].duplicates) {
+          existingEventMap[key].duplicates = [];
+        }
+        existingEventMap[key].duplicates.push(event);
+      } else {
+        existingEventMap[key] = { event: event, duplicates: [] };
+      }
+    });
+    
+    // Add events from feed
+    let addedCount = 0;
+    let skippedDuplicate = 0;
+    let errorCount = 0;
+    
+    expandedEvents.forEach((feedEvent, index) => {
+      // Generate key for this occurrence
+      let key;
+      if (feedEvent.uid) {
+        const uid = feedEvent.uid.trim();
+        key = `${uid}_${feedEvent.startTime.getTime()}`;
+      } else {
+        key = generateEventKey(feedEvent.title, feedEvent.startTime, feedEvent.endTime);
+      }
+      
+      feedEventKeys.add(key);
       
       // Skip if event already exists
       if (existingEventMap[key]) {
-        Logger.log(`  → SKIPPED: Duplicate event already exists`);
         skippedDuplicate++;
         return;
       }
       
+      let description = '';
+      if (feedEvent.description) {
+        description = feedEvent.description;
+      }
+      
+      if (feedEvent.uid) {
+        const uid = feedEvent.uid.trim();
+        description = description ? `${description}\n\nUID:${uid}\n${CONFIG.SYNC_MARKER}` : `UID:${uid}\n${CONFIG.SYNC_MARKER}`;
+      } else {
+        description = description ? `${description}\n\n${CONFIG.SYNC_MARKER}` : CONFIG.SYNC_MARKER;
+      }
+      
       // Create the event
       try {
-        // Create recurring event series if recurrence exists
-        if (event.recurrence) {
-          if (event.isAllDay) {
-            calendar.createAllDayEventSeries(
-              event.title,
-              event.startTime,
-              event.recurrence,
-              {
-                description: event.description,
-                location: event.location
-              }
-            );
-          } else {
-            calendar.createEventSeries(
-              event.title,
-              event.startTime,
-              event.endTime,
-              event.recurrence,
-              {
-                description: event.description,
-                location: event.location
-              }
-            );
-          }
-          Logger.log(`  → ADDED: Recurring event created successfully`);
+        let newEvent;
+        if (feedEvent.isAllDay) {
+          newEvent = calendar.createAllDayEvent(feedEvent.title, feedEvent.startTime, {
+            description: description,
+            location: feedEvent.location
+          });
         } else {
-          // Regular one-time event
-          if (event.isAllDay) {
-            calendar.createAllDayEvent(event.title, event.startTime, {
-              description: event.description,
-              location: event.location
-            });
-          } else {
-            calendar.createEvent(event.title, event.startTime, event.endTime, {
-              description: event.description,
-              location: event.location
-            });
-          }
-          Logger.log(`  → ADDED: One-time event created successfully`);
+          newEvent = calendar.createEvent(feedEvent.title, feedEvent.startTime, feedEvent.endTime, {
+            description: description,
+            location: feedEvent.location
+          });
         }
         
+        if (CONFIG.EVENT_COLOR !== null) {
+          const eventColor = COLOR_MAP[CONFIG.EVENT_COLOR];
+          if (eventColor) {
+            newEvent.setColor(eventColor);
+          } else {
+            Logger.log(`WARNING: Unknown color name "${CONFIG.EVENT_COLOR}". Valid options: ${Object.keys(COLOR_MAP).join(', ')}`);
+          }
+        }
+        
+        Logger.log(`Added event: "${feedEvent.title}" at ${feedEvent.startTime.toISOString()} (key: ${key})`);
         addedCount++;
       } catch (e) {
-        Logger.log(`  → ERROR: Failed to create event - ${e.toString()}`);
+        Logger.log(`ERROR creating event "${feedEvent.title}": ${e.toString()}`);
         errorCount++;
+      }
+    });
+    
+    let deletedCount = 0;
+    Object.keys(existingEventMap).forEach(key => {
+      if (!feedEventKeys.has(key)) {
+        const eventData = existingEventMap[key];
+        
+        // Delete the main event
+        try {
+          eventData.event.deleteEvent();
+          Logger.log(`Deleted event no longer in feed: "${eventData.event.getTitle()}" at ${eventData.event.getStartTime().toISOString()} (key: ${key})`);
+          deletedCount++;
+        } catch (e) {
+          Logger.log(`ERROR deleting event "${eventData.event.getTitle()}": ${e.toString()}`);
+        }
+        
+        // Delete any duplicates
+        if (eventData.duplicates && eventData.duplicates.length > 0) {
+          eventData.duplicates.forEach(dupEvent => {
+            try {
+              dupEvent.deleteEvent();
+              Logger.log(`Deleted duplicate event: "${dupEvent.getTitle()}" at ${dupEvent.getStartTime().toISOString()}`);
+              deletedCount++;
+            } catch (e) {
+              Logger.log(`ERROR deleting duplicate event: ${e.toString()}`);
+            }
+          });
+        }
+      } else {
+        // Event is in feed, but delete any duplicates
+        const eventData = existingEventMap[key];
+        if (eventData.duplicates && eventData.duplicates.length > 0) {
+          Logger.log(`Found ${eventData.duplicates.length} duplicate(s) for event "${eventData.event.getTitle()}" - cleaning up`);
+          eventData.duplicates.forEach(dupEvent => {
+            try {
+              dupEvent.deleteEvent();
+              Logger.log(`Deleted duplicate event: "${dupEvent.getTitle()}" at ${dupEvent.getStartTime().toISOString()}`);
+              deletedCount++;
+            } catch (e) {
+              Logger.log(`ERROR deleting duplicate event: ${e.toString()}`);
+            }
+          });
+        }
       }
     });
     
     Logger.log('\n=== SYNC SUMMARY ===');
     Logger.log(`Total events in feed: ${events.length}`);
-    Logger.log(`Recurring events found: ${recurringCount}`);
+    Logger.log(`Total occurrences after expansion: ${expandedEvents.length}`);
     Logger.log(`Added: ${addedCount}`);
+    Logger.log(`Deleted (no longer in feed or duplicates): ${deletedCount}`);
     Logger.log(`Skipped (duplicates): ${skippedDuplicate}`);
-    Logger.log(`Skipped (past events): ${skippedPast}`);
-    Logger.log(`Skipped (old recurring): ${skippedOldRecurring}`);
-    Logger.log(`Skipped (beyond ${CONFIG.SYNC_WEEKS_AHEAD} weeks): ${skippedFuture}`);
     Logger.log(`Errors: ${errorCount}`);
     
   } catch (error) {
@@ -308,13 +392,17 @@ function parseICS(icsData) {
         location: '',
         isAllDay: false,
         recurrence: null,
-        rruleString: null
+        rruleString: null,
+        uid: null,  // Added UID field
+        recurrenceEndDate: null  // Track UNTIL date
       };
       eventCount++;
     } else if (line === 'END:VEVENT' && currentEvent) {
       if (currentEvent.startTime && currentEvent.endTime) {
         if (currentEvent.rruleString) {
-          currentEvent.recurrence = parseRRule(currentEvent.rruleString);
+          const result = parseRRule(currentEvent.rruleString);
+          currentEvent.recurrence = result.recurrence;
+          currentEvent.recurrenceEndDate = result.endDate;
         }
         events.push(currentEvent);
       } else {
@@ -343,6 +431,9 @@ function parseICS(icsData) {
       }
       
       switch (fieldName) {
+        case 'UID':  // Parse UID field
+          currentEvent.uid = fieldValue.trim();
+          break;
         case 'SUMMARY':
           const summary = decodeICSText(fieldValue);
           if (summary && summary.trim()) {
@@ -388,10 +479,11 @@ function parseRRule(rruleString) {
     });
     
     if (!rules['FREQ']) {
-      return null;
+      return { recurrence: null, endDate: null };
     }
     
     let recurrence;
+    let endDate = null;
     
     switch (rules['FREQ']) {
       case 'DAILY':
@@ -435,13 +527,12 @@ function parseRRule(rruleString) {
         
       default:
         Logger.log(`Unknown FREQ type: ${rules['FREQ']}`);
-        return null;
+        return { recurrence: null, endDate: null };
     }
     
-    // Handle UNTIL (end date)
     if (rules['UNTIL']) {
-      const untilDate = parseICSDate(rules['UNTIL'], {}, {});
-      recurrence.until(untilDate);
+      endDate = parseICSDate(rules['UNTIL'], {}, {});
+      recurrence.until(endDate);
     }
     
     // Handle COUNT (number of occurrences)
@@ -449,86 +540,12 @@ function parseRRule(rruleString) {
       recurrence.times(parseInt(rules['COUNT']));
     }
     
-    return recurrence;
+    return { recurrence, endDate };
     
   } catch (e) {
     Logger.log(`Error parsing RRULE "${rruleString}": ${e.toString()}`);
-    return null;
+    return { recurrence: null, endDate: null };
   }
-}
-
-function extractTimezones(icsData) {
-  const timezones = {};
-  const lines = icsData.split(/\r?\n/);
-  
-  let inTimezone = false;
-  let currentTzid = null;
-  
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim();
-    
-    if (line.startsWith('BEGIN:VTIMEZONE')) {
-      inTimezone = true;
-    } else if (line.startsWith('END:VTIMEZONE')) {
-      inTimezone = false;
-      currentTzid = null;
-    } else if (inTimezone) {
-      if (line.startsWith('TZID:')) {
-        currentTzid = line.substring(5);
-        if (TIMEZONE_MAP[currentTzid]) {
-          timezones[currentTzid] = TIMEZONE_MAP[currentTzid];
-          Logger.log(`Mapped timezone: ${currentTzid} -> ${TIMEZONE_MAP[currentTzid]}`);
-        } else {
-          Logger.log(`WARNING: Unknown timezone: ${currentTzid}`);
-        }
-      }
-    }
-  }
-  
-  return timezones;
-}
-
-function parseICSDate(dateString, params = {}, timezones = {}) {
-  dateString = dateString.trim();
-  
-  if (dateString.length === 8 || params['VALUE'] === 'DATE') {
-    const year = parseInt(dateString.substring(0, 4));
-    const month = parseInt(dateString.substring(4, 6)) - 1;
-    const day = parseInt(dateString.substring(6, 8));
-    return new Date(year, month, day);
-  }
-  
-  const year = parseInt(dateString.substring(0, 4));
-  const month = parseInt(dateString.substring(4, 6)) - 1;
-  const day = parseInt(dateString.substring(6, 8));
-  const hour = parseInt(dateString.substring(9, 11));
-  const minute = parseInt(dateString.substring(11, 13));
-  const second = parseInt(dateString.substring(13, 15)) || 0;
-  
-  if (dateString.endsWith('Z')) {
-    return new Date(Date.UTC(year, month, day, hour, minute, second));
-  }
-  
-  if (params['TZID']) {
-    const tzid = params['TZID'];
-    const ianaTimezone = timezones[tzid] || TIMEZONE_MAP[tzid];
-    
-    if (ianaTimezone) {
-      const utcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
-      const offset = getTimezoneOffset(ianaTimezone, utcDate);
-      return new Date(utcDate.getTime() - offset);
-    }
-  }
-  
-  return new Date(year, month, day, hour, minute, second);
-}
-
-function decodeICSText(text) {
-  return text
-    .replace(/\\n/g, '\n')
-    .replace(/\\,/g, ',')
-    .replace(/\\;/g, ';')
-    .replace(/\\\\/g, '\\');
 }
 
 // ============================================================================
@@ -599,4 +616,187 @@ function setupTrigger() {
     .create();
   
   Logger.log('Trigger set up successfully! Script will run every 30 minutes.');
+}
+
+function generateEventKey(title, startTime, endTime) {
+  return `${title}_${startTime.getTime()}_${endTime.getTime()}`;
+}
+
+function extractTimezones(icsData) {
+  const timezones = {};
+  const lines = icsData.split(/\r?\n/);
+  
+  let inTimezone = false;
+  let currentTzid = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    
+    if (line.startsWith('BEGIN:VTIMEZONE')) {
+      inTimezone = true;
+    } else if (line.startsWith('END:VTIMEZONE')) {
+      inTimezone = false;
+      currentTzid = null;
+    } else if (inTimezone) {
+      if (line.startsWith('TZID:')) {
+        currentTzid = line.substring(5);
+        if (TIMEZONE_MAP[currentTzid]) {
+          timezones[currentTzid] = TIMEZONE_MAP[currentTzid];
+          Logger.log(`Mapped timezone: ${currentTzid} -> ${TIMEZONE_MAP[currentTzid]}`);
+        } else {
+          Logger.log(`WARNING: Unknown timezone: ${currentTzid}`);
+        }
+      }
+    }
+  }
+  
+  return timezones;
+}
+
+function parseICSDate(dateString, params = {}, timezones = {}) {
+  dateString = dateString.trim();
+  
+  // Check if it's a DATE only (all-day event)
+  if (dateString.length === 8 || params['VALUE'] === 'DATE') {
+    const year = parseInt(dateString.substring(0, 4));
+    const month = parseInt(dateString.substring(4, 6)) - 1;
+    const day = parseInt(dateString.substring(6, 8));
+    return new Date(year, month, day);
+  }
+  
+  // Parse datetime: YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ
+  const year = parseInt(dateString.substring(0, 4));
+  const month = parseInt(dateString.substring(4, 6)) - 1;
+  const day = parseInt(dateString.substring(6, 8));
+  const hour = parseInt(dateString.substring(9, 11));
+  const minute = parseInt(dateString.substring(11, 13));
+  const second = parseInt(dateString.substring(13, 15)) || 0;
+  
+  // If it ends with Z, it's explicitly UTC time
+  if (dateString.endsWith('Z')) {
+    return new Date(Date.UTC(year, month, day, hour, minute, second));
+  }
+  
+  // If there's a TZID parameter, try to handle it
+  if (params['TZID']) {
+    const tzid = params['TZID'];
+    const ianaTimezone = timezones[tzid] || TIMEZONE_MAP[tzid];
+    
+    if (ianaTimezone) {
+      const utcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+      const offset = getTimezoneOffset(ianaTimezone, utcDate);
+      return new Date(utcDate.getTime() - offset);
+    }
+  }
+  
+  // Default: treat as local time
+  return new Date(year, month, day, hour, minute, second);
+}
+
+function decodeICSText(text) {
+  return text
+    .replace(/\\n/g, '\n')
+    .replace(/\\,/g, ',')
+    .replace(/\\;/g, ';')
+    .replace(/\\\\/g, '\\');
+}
+
+// ============================================================================
+// NEW FUNCTION TO EXPAND RECURRING EVENTS
+// ============================================================================
+
+function expandRecurringEvent(event, startDate, endDate) {
+  const occurrences = [];
+  
+  try {
+    const rules = {};
+    const parts = event.rruleString.split(';');
+    parts.forEach(part => {
+      const [key, value] = part.split('=');
+      if (key && value) {
+        rules[key] = value;
+      }
+    });
+    
+    if (!rules['FREQ']) {
+      return occurrences;
+    }
+    
+    // Determine recurrence end date
+    let recurrenceEnd = endDate;
+    if (rules['UNTIL']) {
+      const untilDate = parseICSDate(rules['UNTIL'], {}, {});
+      if (untilDate < recurrenceEnd) {
+        recurrenceEnd = untilDate;
+      }
+    }
+    
+    // Skip if recurrence already ended
+    if (recurrenceEnd < startDate) {
+      Logger.log(`Skipping recurring event "${event.title}" - ended on ${recurrenceEnd.toISOString()}`);
+      return occurrences;
+    }
+    
+    const duration = event.endTime.getTime() - event.startTime.getTime();
+    let currentDate = new Date(event.startTime);
+    const interval = rules['INTERVAL'] ? parseInt(rules['INTERVAL']) : 1;
+    const maxOccurrences = rules['COUNT'] ? parseInt(rules['COUNT']) : 1000; // Safety limit
+    let count = 0;
+    
+    // Generate occurrences based on frequency
+    while (currentDate <= recurrenceEnd && count < maxOccurrences) {
+      // Check if this occurrence is within our sync window
+      if (currentDate >= startDate && currentDate <= endDate) {
+        // Check if this day matches the BYDAY rule (for weekly events)
+        let includeOccurrence = true;
+        
+        if (rules['FREQ'] === 'WEEKLY' && rules['BYDAY']) {
+          const dayOfWeek = currentDate.getDay();
+          const dayMap = { 'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6 };
+          const allowedDays = rules['BYDAY'].split(',').map(d => dayMap[d]);
+          includeOccurrence = allowedDays.includes(dayOfWeek);
+        }
+        
+        if (includeOccurrence) {
+          occurrences.push({
+            title: event.title,
+            startTime: new Date(currentDate),
+            endTime: new Date(currentDate.getTime() + duration),
+            description: event.description,
+            location: event.location,
+            isAllDay: event.isAllDay,
+            uid: event.uid,
+            recurrence: null,
+            rruleString: null
+          });
+        }
+      }
+      
+      // Move to next occurrence
+      switch (rules['FREQ']) {
+        case 'DAILY':
+          currentDate.setDate(currentDate.getDate() + interval);
+          break;
+        case 'WEEKLY':
+          currentDate.setDate(currentDate.getDate() + (7 * interval));
+          break;
+        case 'MONTHLY':
+          currentDate.setMonth(currentDate.getMonth() + interval);
+          break;
+        case 'YEARLY':
+          currentDate.setFullYear(currentDate.getFullYear() + interval);
+          break;
+        default:
+          // Unknown frequency, stop
+          break;
+      }
+      
+      count++;
+    }
+    
+  } catch (e) {
+    Logger.log(`Error expanding recurring event "${event.title}": ${e.toString()}`);
+  }
+  
+  return occurrences;
 }

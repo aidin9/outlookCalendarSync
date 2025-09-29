@@ -8,8 +8,11 @@ A Google Apps Script that automatically syncs events from an Outlook calendar IC
 - ✅ Handles recurring events (daily, weekly, monthly, yearly)
 - ✅ Proper timezone conversion with DST support
 - ✅ Avoids duplicate events
+- ✅ One-way sync (removes deleted events)
 - ✅ Syncs events up to 8 weeks ahead
 - ✅ Comprehensive timezone mapping for Outlook timezones
+- ✅ Optional event color customization
+- ✅ Use default calendar or create a separate one
 
 ## Setup Instructions
 
@@ -32,18 +35,52 @@ At the top of `Code.gs`, update the configuration:
 
 \`\`\`javascript
 const CONFIG = {
+  // REQUIRED: Your Outlook calendar ICS feed URL
   ICS_FEED_URL: 'YOUR_OUTLOOK_ICS_URL_HERE',
-  TARGET_CALENDAR_NAME: 'Stryker',  // Change to your target calendar name
+  
+  // OPTIONAL: Target calendar name
+  // Set to null to use your default calendar, or specify a name like 'Work'
+  TARGET_CALENDAR_NAME: 'Work',
+  
+  // OPTIONAL: Event color
+  // Set to null for default color, or use one of:
+  // CalendarApp.EventColor.PALE_BLUE, CalendarApp.EventColor.PALE_GREEN,
+  // CalendarApp.EventColor.MAUVE, CalendarApp.EventColor.PALE_RED,
+  // CalendarApp.EventColor.YELLOW, CalendarApp.EventColor.ORANGE,
+  // CalendarApp.EventColor.CYAN, CalendarApp.EventColor.GRAY,
+  // CalendarApp.EventColor.BLUE, CalendarApp.EventColor.GREEN,
+  // CalendarApp.EventColor.RED
+  EVENT_COLOR: null,
+  
+  // How many weeks ahead to sync
   SYNC_WEEKS_AHEAD: 8
 };
 \`\`\`
 
-### 4. Create Target Calendar (if needed)
+**Configuration Examples:**
+
+\`\`\`javascript
+// Use default calendar with blue events
+TARGET_CALENDAR_NAME: null,
+EVENT_COLOR: CalendarApp.EventColor.BLUE,
+
+// Use separate 'Work' calendar with default color
+TARGET_CALENDAR_NAME: 'Work',
+EVENT_COLOR: null,
+
+// Use 'Personal' calendar with green events
+TARGET_CALENDAR_NAME: 'Personal',
+EVENT_COLOR: CalendarApp.EventColor.GREEN,
+\`\`\`
+
+### 4. Create Target Calendar (Optional)
+
+If you specified a `TARGET_CALENDAR_NAME` (not null), the script will automatically create it if it doesn't exist. You can also create it manually:
 
 1. Open Google Calendar
 2. Click the "+" next to "Other calendars"
 3. Select "Create new calendar"
-4. Name it (e.g., "Stryker" or whatever you set in CONFIG)
+4. Name it to match your `TARGET_CALENDAR_NAME`
 
 ### 5. Authorize and Test
 
@@ -70,9 +107,25 @@ To see what's happening during syncs:
 2. Click on any execution to see detailed logs
 3. Look for:
    - Total events parsed
-   - Events added
-   - Recurring events found
+   - Events added/deleted
+   - Recurring events expanded
    - Any errors or warnings
+
+## How It Works
+
+### One-Way Sync
+- Events are synced from Outlook → Google Calendar
+- Events deleted from Outlook are automatically removed from Google Calendar
+- All synced events are tagged with `[Synced from Outlook]` in their description
+
+### Recurring Events
+- Recurring events are expanded into individual occurrences
+- Only future occurrences within the sync window are created
+- Past occurrences are not created
+
+### Duplicate Prevention
+- Events are tracked by their unique UID from Outlook
+- Duplicate events are automatically detected and removed
 
 ## Troubleshooting
 
@@ -84,13 +137,13 @@ To see what's happening during syncs:
 ### Missing events
 
 - Check the logs for "Skipped" or "ERROR" messages
-- Recurring events older than 6 months are skipped by default
-- Events beyond 8 weeks in the future are skipped
+- Recurring events that have ended are skipped
+- Events beyond the sync window (8 weeks) are skipped
 
 ### Duplicate events
 
-- The script checks for duplicates based on title + start time + end time
-- If you see duplicates, they might have slightly different times or titles
+- The script automatically detects and removes duplicates
+- If you see duplicates, run the sync again - it will clean them up
 
 ## Customization
 
