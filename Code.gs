@@ -7,7 +7,7 @@ const CONFIG = {
   ICS_FEED_URL: 'YOUR_OUTLOOK_ICS_URL_HERE',
   
   // Name of the Google Calendar to sync events to (must already exist)
-  TARGET_CALENDAR_NAME: 'Stryker',
+  TARGET_CALENDAR_NAME: 'Work',
   
   // How many weeks ahead to sync events
   SYNC_WEEKS_AHEAD: 8
@@ -163,27 +163,39 @@ function syncCalendarEvents() {
     let recurringCount = 0;
     
     events.forEach((event, index) => {
+      Logger.log(`\n--- Processing event #${index + 1}: "${event.title}" ---`);
+      Logger.log(`  Start: ${event.startTime ? event.startTime.toISOString() : 'NULL'}`);
+      Logger.log(`  End: ${event.endTime ? event.endTime.toISOString() : 'NULL'}`);
+      Logger.log(`  Has recurrence: ${event.recurrence ? 'YES' : 'NO'}`);
+      if (event.rruleString) {
+        Logger.log(`  RRULE string: ${event.rruleString}`);
+      }
+      
       // Handle recurring events differently - don't skip if they have recurrence
       if (event.recurrence) {
         recurringCount++;
-        Logger.log(`Found recurring event: "${event.title}"`);
+        Logger.log(`  → This is a recurring event`);
         
         // Skip recurring events that started more than 6 months ago to avoid very old series
         const sixMonthsAgo = new Date(now.getTime() - (180 * 24 * 60 * 60 * 1000));
         if (event.startTime < sixMonthsAgo) {
-          Logger.log(`Skipping old recurring event: "${event.title}" (started ${event.startTime.toISOString()})`);
+          Logger.log(`  → SKIPPED: Recurring event started too long ago (${event.startTime.toISOString()})`);
           skippedOldRecurring++;
           return;
         }
       } else {
+        Logger.log(`  → This is a one-time event`);
+        
         // For non-recurring events, skip if in the past
         if (event.endTime < now) {
+          Logger.log(`  → SKIPPED: Event ended in the past (${event.endTime.toISOString()})`);
           skippedPast++;
           return;
         }
         
         // Skip events too far in the future
         if (event.startTime > futureDate) {
+          Logger.log(`  → SKIPPED: Event is beyond ${CONFIG.SYNC_WEEKS_AHEAD} weeks (${event.startTime.toISOString()})`);
           skippedFuture++;
           return;
         }
@@ -193,6 +205,7 @@ function syncCalendarEvents() {
       
       // Skip if event already exists
       if (existingEventMap[key]) {
+        Logger.log(`  → SKIPPED: Duplicate event already exists`);
         skippedDuplicate++;
         return;
       }
@@ -223,7 +236,7 @@ function syncCalendarEvents() {
               }
             );
           }
-          Logger.log(`Added recurring event: "${event.title}" starting ${event.startTime.toISOString()}`);
+          Logger.log(`  → ADDED: Recurring event created successfully`);
         } else {
           // Regular one-time event
           if (event.isAllDay) {
@@ -237,17 +250,17 @@ function syncCalendarEvents() {
               location: event.location
             });
           }
-          Logger.log(`Added event: "${event.title}" at ${event.startTime.toISOString()}`);
+          Logger.log(`  → ADDED: One-time event created successfully`);
         }
         
         addedCount++;
       } catch (e) {
-        Logger.log(`ERROR creating event "${event.title}": ${e.toString()}`);
+        Logger.log(`  → ERROR: Failed to create event - ${e.toString()}`);
         errorCount++;
       }
     });
     
-    Logger.log('=== SYNC SUMMARY ===');
+    Logger.log('\n=== SYNC SUMMARY ===');
     Logger.log(`Total events in feed: ${events.length}`);
     Logger.log(`Recurring events found: ${recurringCount}`);
     Logger.log(`Added: ${addedCount}`);
