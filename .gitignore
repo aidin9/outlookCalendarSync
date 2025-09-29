@@ -1,0 +1,18 @@
+# Google Apps Script
+.clasp.json
+.claspignore
+
+# Personal configuration (if you create a separate config file)
+config.js
+personal-config.gs
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
