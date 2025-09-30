@@ -11,6 +11,12 @@ const CONFIG = {
   // Examples: 'Work', 'Personal', null (for default calendar)
   TARGET_CALENDAR_NAME: 'Work',
   
+  // Target timezone for the Google Calendar
+  // Set to null to use the calendar's default timezone
+  // Examples: 'America/Los_Angeles', 'America/New_York', 'Europe/London', 'Asia/Tokyo'
+  // Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  TARGET_TIMEZONE: null,
+  
   // Event Color Configuration
   // Set to null to keep default calendar color, or use one of these color names:
   // "PALE_BLUE", "PALE_GREEN", "MAUVE", "PALE_RED", "YELLOW", "ORANGE",
@@ -235,6 +241,15 @@ function syncCalendarEvents() {
       }
     });
     
+    const calendarTimezone = calendar.getTimeZone();
+    Logger.log(`Target calendar timezone: ${calendarTimezone}`);
+    if (CONFIG.TARGET_TIMEZONE) {
+      Logger.log(`Config TARGET_TIMEZONE: ${CONFIG.TARGET_TIMEZONE}`);
+      if (CONFIG.TARGET_TIMEZONE !== calendarTimezone) {
+        Logger.log(`WARNING: TARGET_TIMEZONE (${CONFIG.TARGET_TIMEZONE}) differs from calendar timezone (${calendarTimezone})`);
+      }
+    }
+    
     // Add events from feed
     let addedCount = 0;
     let skippedDuplicate = 0;
@@ -270,6 +285,19 @@ function syncCalendarEvents() {
         description = description ? `${description}\n\n${CONFIG.SYNC_MARKER}` : CONFIG.SYNC_MARKER;
       }
       
+      Logger.log(`\n--- Creating Event ---`);
+      Logger.log(`Title: "${feedEvent.title}"`);
+      Logger.log(`Start (UTC): ${feedEvent.startTime.toISOString()}`);
+      Logger.log(`Start (Local): ${feedEvent.startTime.toString()}`);
+      Logger.log(`Start (Timestamp): ${feedEvent.startTime.getTime()}`);
+      if (!feedEvent.isAllDay) {
+        Logger.log(`End (UTC): ${feedEvent.endTime.toISOString()}`);
+        Logger.log(`End (Local): ${feedEvent.endTime.toString()}`);
+      }
+      Logger.log(`Is All Day: ${feedEvent.isAllDay}`);
+      Logger.log(`UID: ${feedEvent.uid || 'none'}`);
+      Logger.log(`Key: ${key}`);
+      
       // Create the event
       try {
         let newEvent;
@@ -294,7 +322,7 @@ function syncCalendarEvents() {
           }
         }
         
-        Logger.log(`Added event: "${feedEvent.title}" at ${feedEvent.startTime.toISOString()} (key: ${key})`);
+        Logger.log(`✓ Created event at: ${newEvent.getStartTime().toISOString()} (${newEvent.getStartTime().toString()})`);
         addedCount++;
       } catch (e) {
         Logger.log(`ERROR creating event "${feedEvent.title}": ${e.toString()}`);
