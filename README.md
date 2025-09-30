@@ -1,6 +1,19 @@
-# Outlook to Google Calendar Sync
+# Outlook Calendar Sync for Google Calendar
 
-A Google Apps Script that automatically syncs events from an Outlook calendar ICS feed to a Google Calendar every 30 minutes.
+A free, open-source Google Apps Script that solves the frustrating limitations of Outlook calendar feeds in Google Calendar.
+
+## The Problem This Solves
+
+If you've tried syncing your Outlook calendar to Google Calendar using the built-in ICS feed subscription, you've likely encountered these issues:
+
+- **24-hour sync delays** - Google Calendar only updates subscribed calendars once every 24 hours, making them nearly useless for real-time scheduling
+- **Wrong timezones** - Events appear hours off due to Outlook's non-standard timezone identifiers that Google Calendar can't interpret correctly
+- **Missing recurring events** - Many recurring events simply don't show up, especially if they started in the past
+- **No deletion sync** - Events deleted from Outlook remain in Google Calendar indefinitely
+- **Incomplete syncs** - Only some events appear with no clear pattern
+- **No control** - Can't force a refresh or customize sync behavior
+
+This script provides a **true one-way sync** that runs automatically every 30 minutes, handles timezones correctly, expands recurring events properly, and removes deleted events.
 
 ## Features
 
