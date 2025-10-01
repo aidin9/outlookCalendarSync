@@ -31,121 +31,6 @@ const CONFIG = {
 };
 
 // ============================================================================
-// COLOR MAPPING
-// ============================================================================
-
-const COLOR_MAP = {
-  'PALE_BLUE': CalendarApp.EventColor.PALE_BLUE,
-  'PALE_GREEN': CalendarApp.EventColor.PALE_GREEN,
-  'MAUVE': CalendarApp.EventColor.MAUVE,
-  'PALE_RED': CalendarApp.EventColor.PALE_RED,
-  'YELLOW': CalendarApp.EventColor.YELLOW,
-  'ORANGE': CalendarApp.EventColor.ORANGE,
-  'CYAN': CalendarApp.EventColor.CYAN,
-  'GRAY': CalendarApp.EventColor.GRAY,
-  'BLUE': CalendarApp.EventColor.BLUE,
-  'GREEN': CalendarApp.EventColor.GREEN,
-  'RED': CalendarApp.EventColor.RED
-};
-
-// ============================================================================
-// TIMEZONE MAPPINGS
-// ============================================================================
-
-// Comprehensive map of Outlook timezone names to IANA timezone identifiers
-const TIMEZONE_MAP = {
-  'Pacific Standard Time': 'America/Los_Angeles',
-  'Mountain Standard Time': 'America/Denver',
-  'Central Standard Time': 'America/Chicago',
-  'Eastern Standard Time': 'America/New_York',
-  'US Mountain Standard Time': 'America/Phoenix',
-  'Alaskan Standard Time': 'America/Anchorage',
-  'Hawaiian Standard Time': 'Pacific/Honolulu',
-  'Atlantic Standard Time': 'America/Halifax',
-  'Newfoundland Standard Time': 'America/St_Johns',
-  'SA Pacific Standard Time': 'America/Bogota',
-  'SA Western Standard Time': 'America/La_Paz',
-  'SA Eastern Standard Time': 'America/Cayenne',
-  'Argentina Standard Time': 'America/Buenos_Aires',
-  'E. South America Standard Time': 'America/Sao_Paulo',
-  'Greenland Standard Time': 'America/Godthab',
-  'Montevideo Standard Time': 'America/Montevideo',
-  'UTC': 'UTC',
-  'GMT Standard Time': 'Europe/London',
-  'Greenwich Standard Time': 'Atlantic/Reykjavik',
-  'W. Europe Standard Time': 'Europe/Berlin',
-  'Central Europe Standard Time': 'Europe/Budapest',
-  'Romance Standard Time': 'Europe/Paris',
-  'Central European Standard Time': 'Europe/Warsaw',
-  'W. Central Africa Standard Time': 'Africa/Lagos',
-  'Namibia Standard Time': 'Africa/Windhoek',
-  'Jordan Standard Time': 'Asia/Amman',
-  'GTB Standard Time': 'Europe/Bucharest',
-  'Middle East Standard Time': 'Asia/Beirut',
-  'Egypt Standard Time': 'Africa/Cairo',
-  'Syria Standard Time': 'Asia/Damascus',
-  'E. Europe Standard Time': 'Europe/Chisinau',
-  'South Africa Standard Time': 'Africa/Johannesburg',
-  'FLE Standard Time': 'Europe/Kiev',
-  'Turkey Standard Time': 'Europe/Istanbul',
-  'Israel Standard Time': 'Asia/Jerusalem',
-  'Libya Standard Time': 'Africa/Tripoli',
-  'Arabic Standard Time': 'Asia/Baghdad',
-  'Arab Standard Time': 'Asia/Riyadh',
-  'Arabian Standard Time': 'Asia/Dubai',
-  'Belarus Standard Time': 'Europe/Minsk',
-  'Russian Standard Time': 'Europe/Moscow',
-  'E. Africa Standard Time': 'Africa/Nairobi',
-  'Iran Standard Time': 'Asia/Tehran',
-  'Caucasus Standard Time': 'Asia/Yerevan',
-  'Azerbaijan Standard Time': 'Asia/Baku',
-  'Mauritius Standard Time': 'Indian/Mauritius',
-  'Georgian Standard Time': 'Asia/Tbilisi',
-  'Afghanistan Standard Time': 'Asia/Kabul',
-  'West Asia Standard Time': 'Asia/Tashkent',
-  'Pakistan Standard Time': 'Asia/Karachi',
-  'India Standard Time': 'Asia/Kolkata',
-  'Sri Lanka Standard Time': 'Asia/Colombo',
-  'Nepal Standard Time': 'Asia/Kathmandu',
-  'Central Asia Standard Time': 'Asia/Almaty',
-  'Bangladesh Standard Time': 'Asia/Dhaka',
-  'Ekaterinburg Standard Time': 'Asia/Yekaterinburg',
-  'Myanmar Standard Time': 'Asia/Rangoon',
-  'SE Asia Standard Time': 'Asia/Bangkok',
-  'N. Central Asia Standard Time': 'Asia/Novosibirsk',
-  'China Standard Time': 'Asia/Shanghai',
-  'North Asia Standard Time': 'Asia/Krasnoyarsk',
-  'Singapore Standard Time': 'Asia/Singapore',
-  'W. Australia Standard Time': 'Australia/Perth',
-  'Taipei Standard Time': 'Asia/Taipei',
-  'Ulaanbaatar Standard Time': 'Asia/Ulaanbaatar',
-  'North Asia East Standard Time': 'Asia/Irkutsk',
-  'Japan Standard Time': 'Asia/Tokyo',
-  'Korea Standard Time': 'Asia/Seoul',
-  'Cen. Australia Standard Time': 'Australia/Adelaide',
-  'AUS Central Standard Time': 'Australia/Darwin',
-  'E. Australia Standard Time': 'Australia/Brisbane',
-  'AUS Eastern Standard Time': 'Australia/Sydney',
-  'West Pacific Standard Time': 'Pacific/Port_Moresby',
-  'Tasmania Standard Time': 'Australia/Hobart',
-  'Yakutsk Standard Time': 'Asia/Yakutsk',
-  'Central Pacific Standard Time': 'Pacific/Guadalcanal',
-  'Vladivostok Standard Time': 'Asia/Vladivostok',
-  'New Zealand Standard Time': 'Pacific/Auckland',
-  'Fiji Standard Time': 'Pacific/Fiji',
-  'Kamchatka Standard Time': 'Asia/Kamchatka',
-  'Tonga Standard Time': 'Pacific/Tongatapu',
-  'Samoa Standard Time': 'Pacific/Apia',
-  'Azores Standard Time': 'Atlantic/Azores',
-  'Cape Verde Standard Time': 'Atlantic/Cape_Verde',
-  'Morocco Standard Time': 'Africa/Casablanca',
-  'Dateline Standard Time': 'Etc/GMT+12',
-  'UTC-11': 'Etc/GMT+11',
-  'UTC-02': 'Etc/GMT+2',
-  'UTC+12': 'Etc/GMT-12'
-};
-
-// ============================================================================
 // MAIN SYNC FUNCTION
 // ============================================================================
 
@@ -314,7 +199,8 @@ function syncCalendarEvents() {
         }
         
         if (CONFIG.EVENT_COLOR !== null) {
-          const eventColor = COLOR_MAP[CONFIG.EVENT_COLOR];
+          const colorKey = CONFIG.EVENT_COLOR.toUpperCase();
+          const eventColor = COLOR_MAP[colorKey];
           if (eventColor) {
             newEvent.setColor(eventColor);
           } else {
@@ -421,8 +307,8 @@ function parseICS(icsData) {
         isAllDay: false,
         recurrence: null,
         rruleString: null,
-        uid: null,  // Added UID field
-        recurrenceEndDate: null  // Track UNTIL date
+        uid: null,
+        recurrenceEndDate: null
       };
       eventCount++;
     } else if (line === 'END:VEVENT' && currentEvent) {
@@ -459,7 +345,7 @@ function parseICS(icsData) {
       }
       
       switch (fieldName) {
-        case 'UID':  // Parse UID field
+        case 'UID':
           currentEvent.uid = fieldValue.trim();
           break;
         case 'SUMMARY':
@@ -563,7 +449,6 @@ function parseRRule(rruleString) {
       recurrence.until(endDate);
     }
     
-    // Handle COUNT (number of occurrences)
     if (rules['COUNT']) {
       recurrence.times(parseInt(rules['COUNT']));
     }
@@ -645,6 +530,10 @@ function setupTrigger() {
   
   Logger.log('Trigger set up successfully! Script will run every 30 minutes.');
 }
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 function generateEventKey(title, startTime, endTime) {
   return `${title}_${startTime.getTime()}_${endTime.getTime()}`;
@@ -729,10 +618,6 @@ function decodeICSText(text) {
     .replace(/\\\\/g, '\\');
 }
 
-// ============================================================================
-// NEW FUNCTION TO EXPAND RECURRING EVENTS
-// ============================================================================
-
 function expandRecurringEvent(event, startDate, endDate) {
   const occurrences = [];
   
@@ -768,7 +653,7 @@ function expandRecurringEvent(event, startDate, endDate) {
     const duration = event.endTime.getTime() - event.startTime.getTime();
     let currentDate = new Date(event.startTime);
     const interval = rules['INTERVAL'] ? parseInt(rules['INTERVAL']) : 1;
-    const maxOccurrences = rules['COUNT'] ? parseInt(rules['COUNT']) : 1000; // Safety limit
+    const maxOccurrences = rules['COUNT'] ? parseInt(rules['COUNT']) : 1000;
     let count = 0;
     
     // Generate occurrences based on frequency
@@ -815,7 +700,6 @@ function expandRecurringEvent(event, startDate, endDate) {
           currentDate.setFullYear(currentDate.getFullYear() + interval);
           break;
         default:
-          // Unknown frequency, stop
           break;
       }
       
@@ -828,3 +712,169 @@ function expandRecurringEvent(event, startDate, endDate) {
   
   return occurrences;
 }
+
+// ============================================================================
+// COLOR MAPPING
+// ============================================================================
+
+const COLOR_MAP = {
+  'PALE_BLUE': CalendarApp.EventColor.PALE_BLUE,
+  'PALE_GREEN': CalendarApp.EventColor.PALE_GREEN,
+  'MAUVE': CalendarApp.EventColor.MAUVE,
+  'PALE_RED': CalendarApp.EventColor.PALE_RED,
+  'YELLOW': CalendarApp.EventColor.YELLOW,
+  'ORANGE': CalendarApp.EventColor.ORANGE,
+  'CYAN': CalendarApp.EventColor.CYAN,
+  'GRAY': CalendarApp.EventColor.GRAY,
+  'BLUE': CalendarApp.EventColor.BLUE,
+  'GREEN': CalendarApp.EventColor.GREEN,
+  'RED': CalendarApp.EventColor.RED
+};
+
+// ============================================================================
+// TIMEZONE MAPPINGS
+// ============================================================================
+
+// Comprehensive map of Outlook timezone names to IANA timezone identifiers
+const TIMEZONE_MAP = {
+  // North America
+  'Pacific Standard Time': 'America/Los_Angeles',
+  'Mountain Standard Time': 'America/Denver',
+  'Central Standard Time': 'America/Chicago',
+  'Eastern Standard Time': 'America/New_York',
+  'US Mountain Standard Time': 'America/Phoenix',
+  'Alaskan Standard Time': 'America/Anchorage',
+  'Aleutian Standard Time': 'America/Adak',
+  'Hawaiian Standard Time': 'Pacific/Honolulu',
+  'Atlantic Standard Time': 'America/Halifax',
+  'Newfoundland Standard Time': 'America/St_Johns',
+  
+  // Central & South America
+  'SA Pacific Standard Time': 'America/Bogota',
+  'SA Western Standard Time': 'America/La_Paz',
+  'SA Eastern Standard Time': 'America/Cayenne',
+  'Argentina Standard Time': 'America/Buenos_Aires',
+  'E. South America Standard Time': 'America/Sao_Paulo',
+  'Greenland Standard Time': 'America/Godthab',
+  'Montevideo Standard Time': 'America/Montevideo',
+  'Venezuela Standard Time': 'America/Caracas',
+  'Paraguay Standard Time': 'America/Asuncion',
+  'Bahia Standard Time': 'America/Bahia',
+  'Tocantins Standard Time': 'America/Araguaina',
+  'Cuba Standard Time': 'America/Havana',
+  'Haiti Standard Time': 'America/Port-au-Prince',
+  'Turks And Caicos Standard Time': 'America/Grand_Turk',
+  'Saint Pierre Standard Time': 'America/Miquelon',
+  
+  // UTC & Atlantic
+  'UTC': 'UTC',
+  'Azores Standard Time': 'Atlantic/Azores',
+  'Cape Verde Standard Time': 'Atlantic/Cape_Verde',
+  
+  // Europe
+  'GMT Standard Time': 'Europe/London',
+  'Greenwich Standard Time': 'Atlantic/Reykjavik',
+  'W. Europe Standard Time': 'Europe/Berlin',
+  'Central Europe Standard Time': 'Europe/Budapest',
+  'Romance Standard Time': 'Europe/Paris',
+  'Central European Standard Time': 'Europe/Warsaw',
+  'GTB Standard Time': 'Europe/Bucharest',
+  'E. Europe Standard Time': 'Europe/Chisinau',
+  'FLE Standard Time': 'Europe/Kiev',
+  'Turkey Standard Time': 'Europe/Istanbul',
+  'Belarus Standard Time': 'Europe/Minsk',
+  'Russian Standard Time': 'Europe/Moscow',
+  'Kaliningrad Standard Time': 'Europe/Kaliningrad',
+  'Volgograd Standard Time': 'Europe/Volgograd',
+  'Astrakhan Standard Time': 'Europe/Astrakhan',
+  'Saratov Standard Time': 'Europe/Saratov',
+  
+  // Africa
+  'W. Central Africa Standard Time': 'Africa/Lagos',
+  'Namibia Standard Time': 'Africa/Windhoek',
+  'Egypt Standard Time': 'Africa/Cairo',
+  'South Africa Standard Time': 'Africa/Johannesburg',
+  'Libya Standard Time': 'Africa/Tripoli',
+  'E. Africa Standard Time': 'Africa/Nairobi',
+  'Morocco Standard Time': 'Africa/Casablanca',
+  'Sao Tome Standard Time': 'Africa/Sao_Tome',
+  'Sudan Standard Time': 'Africa/Khartoum',
+  
+  // Middle East
+  'Jordan Standard Time': 'Asia/Amman',
+  'Middle East Standard Time': 'Asia/Beirut',
+  'Syria Standard Time': 'Asia/Damascus',
+  'Israel Standard Time': 'Asia/Jerusalem',
+  'Arabic Standard Time': 'Asia/Baghdad',
+  'Arab Standard Time': 'Asia/Riyadh',
+  'Arabian Standard Time': 'Asia/Dubai',
+  'Iran Standard Time': 'Asia/Tehran',
+  'West Bank Standard Time': 'Asia/Hebron',
+  'West Bank Gaza Standard Time': 'Asia/Gaza',
+  
+  // Central Asia
+  'Caucasus Standard Time': 'Asia/Yerevan',
+  'Azerbaijan Standard Time': 'Asia/Baku',
+  'Georgian Standard Time': 'Asia/Tbilisi',
+  'Afghanistan Standard Time': 'Asia/Kabul',
+  'West Asia Standard Time': 'Asia/Tashkent',
+  'Pakistan Standard Time': 'Asia/Karachi',
+  'India Standard Time': 'Asia/Kolkata',
+  'Sri Lanka Standard Time': 'Asia/Colombo',
+  'Nepal Standard Time': 'Asia/Kathmandu',
+  'Central Asia Standard Time': 'Asia/Almaty',
+  'Bangladesh Standard Time': 'Asia/Dhaka',
+  'Ekaterinburg Standard Time': 'Asia/Yekaterinburg',
+  'Myanmar Standard Time': 'Asia/Rangoon',
+  'Qyzylorda Standard Time': 'Asia/Qyzylorda',
+  'Omsk Standard Time': 'Asia/Omsk',
+  
+  // East Asia
+  'SE Asia Standard Time': 'Asia/Bangkok',
+  'N. Central Asia Standard Time': 'Asia/Novosibirsk',
+  'China Standard Time': 'Asia/Shanghai',
+  'North Asia Standard Time': 'Asia/Krasnoyarsk',
+  'Singapore Standard Time': 'Asia/Singapore',
+  'Taipei Standard Time': 'Asia/Taipei',
+  'Ulaanbaatar Standard Time': 'Asia/Ulaanbaatar',
+  'North Asia East Standard Time': 'Asia/Irkutsk',
+  'Japan Standard Time': 'Asia/Tokyo',
+  'Korea Standard Time': 'Asia/Seoul',
+  'Yakutsk Standard Time': 'Asia/Yakutsk',
+  'Vladivostok Standard Time': 'Asia/Vladivostok',
+  'Magadan Standard Time': 'Asia/Magadan',
+  'Sakhalin Standard Time': 'Asia/Sakhalin',
+  'Transbaikal Standard Time': 'Asia/Chita',
+  'Tomsk Standard Time': 'Asia/Tomsk',
+  'Altai Standard Time': 'Asia/Barnaul',
+  
+  // Australia & Pacific
+  'W. Australia Standard Time': 'Australia/Perth',
+  'Cen. Australia Standard Time': 'Australia/Adelaide',
+  'AUS Central Standard Time': 'Australia/Darwin',
+  'E. Australia Standard Time': 'Australia/Brisbane',
+  'AUS Eastern Standard Time': 'Australia/Sydney',
+  'Tasmania Standard Time': 'Australia/Hobart',
+  'Lord Howe Standard Time': 'Australia/Lord_Howe',
+  'West Pacific Standard Time': 'Pacific/Port_Moresby',
+  'Central Pacific Standard Time': 'Pacific/Guadalcanal',
+  'New Zealand Standard Time': 'Pacific/Auckland',
+  'Fiji Standard Time': 'Pacific/Fiji',
+  'Kamchatka Standard Time': 'Asia/Kamchatka',
+  'Tonga Standard Time': 'Pacific/Tongatapu',
+  'Samoa Standard Time': 'Pacific/Apia',
+  'Chatham Islands Standard Time': 'Pacific/Chatham',
+  'Line Islands Standard Time': 'Pacific/Kiritimati',
+  'Norfolk Standard Time': 'Pacific/Norfolk',
+  'Marquesas Standard Time': 'Pacific/Marquesas',
+  
+  // Indian Ocean
+  'Mauritius Standard Time': 'Indian/Mauritius',
+  
+  // UTC Offsets
+  'Dateline Standard Time': 'Etc/GMT+12',
+  'UTC-11': 'Etc/GMT+11',
+  'UTC-02': 'Etc/GMT+2',
+  'UTC+12': 'Etc/GMT-12',
+  'UTC+13': 'Etc/GMT-13'
+};
