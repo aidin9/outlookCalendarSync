@@ -57,7 +57,7 @@ At the top of Code.gs, update the configuration:
 
 - **ICS_FEED_URL** (required): Your Outlook calendar ICS feed URL
 - **TARGET_CALENDAR_NAME** (optional): Set to null to use your default calendar, or specify a name like 'Work'
-- **EVENT_COLOR** (optional): Set to null for default color, or use CalendarApp.EventColor.BLUE, CalendarApp.EventColor.GREEN, etc.
+- **EVENT_COLOR** (optional): Set to null for default color, or use a color name like "BLUE", "GREEN", "RED", "PALE_BLUE", "PALE_GREEN", "MAUVE", "PALE_RED", "YELLOW", "ORANGE", "CYAN", "GRAY"
 - **SYNC_WEEKS_AHEAD**: How many weeks ahead to sync (default: 8)
 
 **Configuration examples:**
@@ -65,7 +65,7 @@ At the top of Code.gs, update the configuration:
 Use default calendar with blue events:
 
     TARGET_CALENDAR_NAME: null,
-    EVENT_COLOR: CalendarApp.EventColor.BLUE,
+    EVENT_COLOR: "BLUE",
 
 Use separate 'Work' calendar with default color:
 
@@ -75,7 +75,7 @@ Use separate 'Work' calendar with default color:
 Use 'Personal' calendar with green events:
 
     TARGET_CALENDAR_NAME: 'Personal',
-    EVENT_COLOR: CalendarApp.EventColor.GREEN,
+    EVENT_COLOR: "GREEN",
 
 ### 4. Create Target Calendar (Optional)
 
