@@ -44,56 +44,47 @@ This script provides a **true one-way sync** that runs automatically every 30 mi
 
 ### 3. Configure the Script
 
-At the top of `Code.gs`, update the configuration:
+At the top of Code.gs, update the configuration:
 
-\`\`\`javascript
-const CONFIG = {
-  // REQUIRED: Your Outlook calendar ICS feed URL
-  ICS_FEED_URL: 'YOUR_OUTLOOK_ICS_URL_HERE',
-  
-  // OPTIONAL: Target calendar name
-  // Set to null to use your default calendar, or specify a name like 'Work'
-  TARGET_CALENDAR_NAME: 'Work',
-  
-  // OPTIONAL: Event color
-  // Set to null for default color, or use one of:
-  // CalendarApp.EventColor.PALE_BLUE, CalendarApp.EventColor.PALE_GREEN,
-  // CalendarApp.EventColor.MAUVE, CalendarApp.EventColor.PALE_RED,
-  // CalendarApp.EventColor.YELLOW, CalendarApp.EventColor.ORANGE,
-  // CalendarApp.EventColor.CYAN, CalendarApp.EventColor.GRAY,
-  // CalendarApp.EventColor.BLUE, CalendarApp.EventColor.GREEN,
-  // CalendarApp.EventColor.RED
-  EVENT_COLOR: null,
-  
-  // How many weeks ahead to sync
-  SYNC_WEEKS_AHEAD: 8
-};
-\`\`\`
+    const CONFIG = {
+      ICS_FEED_URL: 'YOUR_OUTLOOK_ICS_URL_HERE',
+      TARGET_CALENDAR_NAME: 'Work',
+      EVENT_COLOR: null,
+      SYNC_WEEKS_AHEAD: 8
+    };
 
-**Configuration Examples:**
+**Configuration options:**
 
-\`\`\`javascript
-// Use default calendar with blue events
-TARGET_CALENDAR_NAME: null,
-EVENT_COLOR: CalendarApp.EventColor.BLUE,
+- **ICS_FEED_URL** (required): Your Outlook calendar ICS feed URL
+- **TARGET_CALENDAR_NAME** (optional): Set to null to use your default calendar, or specify a name like 'Work'
+- **EVENT_COLOR** (optional): Set to null for default color, or use CalendarApp.EventColor.BLUE, CalendarApp.EventColor.GREEN, etc.
+- **SYNC_WEEKS_AHEAD**: How many weeks ahead to sync (default: 8)
 
-// Use separate 'Work' calendar with default color
-TARGET_CALENDAR_NAME: 'Work',
-EVENT_COLOR: null,
+**Configuration examples:**
 
-// Use 'Personal' calendar with green events
-TARGET_CALENDAR_NAME: 'Personal',
-EVENT_COLOR: CalendarApp.EventColor.GREEN,
-\`\`\`
+Use default calendar with blue events:
+
+    TARGET_CALENDAR_NAME: null,
+    EVENT_COLOR: CalendarApp.EventColor.BLUE,
+
+Use separate 'Work' calendar with default color:
+
+    TARGET_CALENDAR_NAME: 'Work',
+    EVENT_COLOR: null,
+
+Use 'Personal' calendar with green events:
+
+    TARGET_CALENDAR_NAME: 'Personal',
+    EVENT_COLOR: CalendarApp.EventColor.GREEN,
 
 ### 4. Create Target Calendar (Optional)
 
-If you specified a `TARGET_CALENDAR_NAME` (not null), the script will automatically create it if it doesn't exist. You can also create it manually:
+If you specified a TARGET_CALENDAR_NAME (not null), the script will automatically create it if it doesn't exist. You can also create it manually:
 
 1. Open Google Calendar
 2. Click the "+" next to "Other calendars"
 3. Select "Create new calendar"
-4. Name it to match your `TARGET_CALENDAR_NAME`
+4. Name it to match your TARGET_CALENDAR_NAME
 
 ### 5. Authorize and Test
 
@@ -162,24 +153,25 @@ To see what's happening during syncs:
 
 ### Change sync frequency
 
-In `setupTrigger()`, modify:
-\`\`\`javascript
-.everyMinutes(30)  // Change to 15, 30, or 60
-\`\`\`
+In setupTrigger(), modify the line:
+
+    .everyMinutes(30)
+
+Change to 15, 30, or 60 minutes
 
 ### Change sync window
 
-In the CONFIG object:
-\`\`\`javascript
-SYNC_WEEKS_AHEAD: 8  // Change to desired number of weeks
-\`\`\`
+In the CONFIG object, change:
+
+    SYNC_WEEKS_AHEAD: 8
+
+Set to desired number of weeks
 
 ### Add more timezones
 
-If you encounter "Unknown timezone" warnings in logs, add mappings to the `TIMEZONE_MAP` object in the format:
-\`\`\`javascript
-'Outlook Timezone Name': 'IANA/Timezone/Identifier'
-\`\`\`
+If you encounter "Unknown timezone" warnings in logs, add mappings to the TIMEZONE_MAP object in the format:
+
+    'Outlook Timezone Name': 'IANA/Timezone/Identifier'
 
 ## License
 
