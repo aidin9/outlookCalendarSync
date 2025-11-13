@@ -476,6 +476,9 @@ function isDST(date) {
   const novemberFirst = new Date(year, 10, 1);
   const dstEnd = new Date(year, 10, 1 + (7 - novemberFirst.getDay()), 2, 0, 0);
   
+  Logger.log(`[v0] DST check for ${date.toISOString()}: DST starts ${dstStart.toISOString()}, DST ends ${dstEnd.toISOString()}`);
+  Logger.log(`[v0] DST active: ${date >= dstStart && date < dstEnd}`);
+  
   return date >= dstStart && date < dstEnd;
 }
 
