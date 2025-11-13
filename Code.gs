@@ -260,6 +260,10 @@ function syncCalendarEvents() {
       }
     });
     
+    Logger.log('\n=== SECOND PASS: Cleaning up same-day DST duplicates ===');
+    const dupDeleteCount = cleanupSameDayDuplicates(calendar, CONFIG.SYNC_MARKER);
+    deletedCount += dupDeleteCount;
+
     Logger.log('\n=== SYNC SUMMARY ===');
     Logger.log(`Total events in feed: ${events.length}`);
     Logger.log(`Total occurrences after expansion: ${expandedEvents.length}`);
@@ -881,3 +885,74 @@ const TIMEZONE_MAP = {
   'UTC+12': 'Etc/GMT-12',
   'UTC+13': 'Etc/GMT-13'
 };
+
+// Function to clean up same-day DST-related duplicates with same UID
+function cleanupSameDayDuplicates(calendar, syncMarker) {
+  let deletedCount = 0;
+  
+  try {
+    // Get all synced events from the past week to today
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    const allSyncedEvents = calendar.getEvents(oneWeekAgo, now).filter(event => {
+      const desc = event.getDescription();
+      return desc && desc.includes(syncMarker);
+    });
+    
+    // Group events by UID and date
+    const eventsByUIDAndDate = {};
+    
+    allSyncedEvents.forEach(event => {
+      const desc = event.getDescription();
+      const uidMatch = desc ? desc.match(/UID:([^\n]+)/) : null;
+      
+      if (!uidMatch) return; // Skip events without UID
+      
+      const uid = uidMatch[1].trim();
+      const startDate = new Date(event.getStartTime());
+      const dateKey = `${startDate.getFullYear()}-${startDate.getMonth()}-${startDate.getDate()}`;
+      const groupKey = `${uid}_${dateKey}`;
+      
+      if (!eventsByUIDAndDate[groupKey]) {
+        eventsByUIDAndDate[groupKey] = [];
+      }
+      eventsByUIDAndDate[groupKey].push(event);
+    });
+    
+    // Find and delete duplicates (keep one per UID+date combination)
+    Object.keys(eventsByUIDAndDate).forEach(groupKey => {
+      const events = eventsByUIDAndDate[groupKey];
+      
+      if (events.length > 1) {
+        Logger.log(`Found ${events.length} events with same UID on same day (${groupKey})`);
+        
+        // Sort by time and keep the first one (earliest on that day)
+        events.sort((a, b) => a.getStartTime().getTime() - b.getStartTime().getTime());
+        
+        // Delete all but the first
+        for (let i = 1; i < events.length; i++) {
+          try {
+            const dupEvent = events[i];
+            Logger.log(`  Deleting duplicate: "${dupEvent.getTitle()}" at ${dupEvent.getStartTime().toISOString()}`);
+            dupEvent.deleteEvent();
+            deletedCount++;
+          } catch (e) {
+            Logger.log(`  ERROR deleting duplicate: ${e.toString()}`);
+          }
+        }
+      }
+    });
+    
+    if (deletedCount > 0) {
+      Logger.log(`Cleaned up ${deletedCount} same-day DST duplicates`);
+    } else {
+      Logger.log(`No same-day duplicates found`);
+    }
+    
+  } catch (e) {
+    Logger.log(`ERROR in cleanupSameDayDuplicates: ${e.toString()}`);
+  }
+  
+  return deletedCount;
+}
