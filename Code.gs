@@ -135,6 +135,13 @@ function syncCalendarEvents() {
       }
     }
     
+    const feedUIDs = new Set();
+    expandedEvents.forEach(evt => {
+      if (evt.uid) {
+        feedUIDs.add(evt.uid.trim());
+      }
+    });
+
     // Add events from feed
     let addedCount = 0;
     let skippedDuplicate = 0;
@@ -221,10 +228,21 @@ function syncCalendarEvents() {
       if (!feedEventKeys.has(key)) {
         const eventData = existingEventMap[key];
         
-        // Delete the main event
+        const desc = eventData.event.getDescription();
+        const uidMatch = desc ? desc.match(/UID:([^\n]+)/) : null;
+        const uid = uidMatch ? uidMatch[1].trim() : null;
+        
+        // If UID exists in feed but with different timestamp, this is a rescheduled event - delete the old time
+        const isRescheduled = uid && feedUIDs.has(uid);
+        
+        if (isRescheduled) {
+          Logger.log(`Detected rescheduled event (UID in feed but different time): "${eventData.event.getTitle()}" at ${eventData.event.getStartTime().toISOString()}`);
+        }
+        
+        // Delete the main event (either removed from feed OR rescheduled to different time)
         try {
           eventData.event.deleteEvent();
-          Logger.log(`Deleted event no longer in feed: "${eventData.event.getTitle()}" at ${eventData.event.getStartTime().toISOString()} (key: ${key})`);
+          Logger.log(`Deleted event ${isRescheduled ? '(rescheduled)' : 'no longer in feed'}: "${eventData.event.getTitle()}" at ${eventData.event.getStartTime().toISOString()} (key: ${key})`);
           deletedCount++;
         } catch (e) {
           Logger.log(`ERROR deleting event "${eventData.event.getTitle()}": ${e.toString()}`);
